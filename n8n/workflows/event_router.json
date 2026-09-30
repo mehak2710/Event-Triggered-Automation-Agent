@@ -1,0 +1,151 @@
+{
+  "name": "event_router",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "events", "responseMode": "responseNode", "options": {} },
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 240],
+      "webhookId": "b2000000-0000-4000-8000-000000000001"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst data = body.data || {};\nreturn [{ json: { event_id: body.id, type: body.type, data, fail: data.simulate_failure === true } }];"
+      },
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "name": "Prepare Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 240]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.fail }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000003",
+      "name": "Simulate Failure?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 240]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"error\", \"event_id\": \"{{ $json.event_id }}\" }",
+        "options": { "responseCode": 500 }
+      },
+      "id": "a1000000-0000-4000-8000-000000000004",
+      "name": "Respond 500",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [700, 80]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [
+                  { "id": "r1", "leftValue": "={{ $json.type }}", "rightValue": "order.created", "operator": { "type": "string", "operation": "equals" } }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "order.created"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [
+                  { "id": "r2", "leftValue": "={{ $json.type }}", "rightValue": "user.signup", "operator": { "type": "string", "operation": "equals" } }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "user.signup"
+            }
+          ]
+        },
+        "options": { "fallbackOutput": "extra" }
+      },
+      "id": "a1000000-0000-4000-8000-000000000005",
+      "name": "Route by Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [700, 340]
+    },
+    {
+      "parameters": { "jsCode": "// Replace with Slack / Google Sheets / Groq nodes\nreturn [{ json: { ...$input.first().json, result: 'order handled' } }];" },
+      "id": "a1000000-0000-4000-8000-000000000006",
+      "name": "Handle Order",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 240]
+    },
+    {
+      "parameters": { "jsCode": "// Replace with Slack / Google Sheets / Groq nodes\nreturn [{ json: { ...$input.first().json, result: 'signup handled' } }];" },
+      "id": "a1000000-0000-4000-8000-000000000007",
+      "name": "Handle Signup",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 400]
+    },
+    {
+      "parameters": { "jsCode": "return [{ json: { ...$input.first().json, result: 'no handler for this type' } }];" },
+      "id": "a1000000-0000-4000-8000-000000000008",
+      "name": "Unhandled Type",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 560]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"ok\", \"event_id\": \"{{ $json.event_id }}\", \"result\": \"{{ $json.result }}\" }",
+        "options": { "responseCode": 200 }
+      },
+      "id": "a1000000-0000-4000-8000-000000000009",
+      "name": "Respond 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1220, 400]
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Prepare Event", "type": "main", "index": 0 }]] },
+    "Prepare Event": { "main": [[{ "node": "Simulate Failure?", "type": "main", "index": 0 }]] },
+    "Simulate Failure?": {
+      "main": [
+        [{ "node": "Respond 500", "type": "main", "index": 0 }],
+        [{ "node": "Route by Type", "type": "main", "index": 0 }]
+      ]
+    },
+    "Route by Type": {
+      "main": [
+        [{ "node": "Handle Order", "type": "main", "index": 0 }],
+        [{ "node": "Handle Signup", "type": "main", "index": 0 }],
+        [{ "node": "Unhandled Type", "type": "main", "index": 0 }]
+      ]
+    },
+    "Handle Order": { "main": [[{ "node": "Respond 200", "type": "main", "index": 0 }]] },
+    "Handle Signup": { "main": [[{ "node": "Respond 200", "type": "main", "index": 0 }]] },
+    "Unhandled Type": { "main": [[{ "node": "Respond 200", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}
